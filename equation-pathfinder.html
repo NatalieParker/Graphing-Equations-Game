@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equation Pathfinder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --bg: #0a0e27;
+    --surface: #151b3d;
+    --grid: #1e2852;
+    --accent1: #00f0ff;
+    --accent2: #ff006e;
+    --accent3: #ffd60a;
+    --text: #e0e7ff;
+    --textDim: #8b92b8;
+    --success: #39ff14;
+    --danger: #ff006e;
+  }
+  
+  body {
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1f4a 100%);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  
+  h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 2.8rem;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+    animation: glow 3s ease-in-out infinite alternate;
+  }
+  
+  @keyframes glow {
+    from { filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.4)); }
+    to { filter: drop-shadow(0 0 20px rgba(255, 0, 110, 0.4)); }
+  }
+  
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--textDim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+  
+  /* Difficulty selector */
+  .difficulty-bar {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  
+  .diff-btn {
+    padding: 10px 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 2px solid var(--grid);
+    background: var(--surface);
+    color: var(--textDim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .diff-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+  
+  .diff-btn:hover::before { left: 100%; }
+  .diff-btn:hover { border-color: var(--accent1); color: var(--accent1); transform: translateY(-2px); }
+  
+  .diff-btn.active {
+    border-color: var(--accent1);
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(255, 0, 110, 0.1));
+    color: var(--accent1);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.3), inset 0 0 20px rgba(0, 240, 255, 0.1);
+  }
+  
+  /* Game container */
+  .game-container {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+    max-width: 1400px;
+    width: 100%;
+  }
+  
+  /* Canvas area */
+  .canvas-area {
+    background: var(--surface);
+    border: 2px solid var(--grid);
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  
+  .level-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--grid);
+  }
+  
+  .level-info {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    color: var(--accent1);
+    letter-spacing: 0.1em;
+  }
+  
+  .stats {
+    display: flex;
+    gap: 16px;
+    font-size: 0.8rem;
+    color: var(--textDim);
+  }
+  
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  canvas {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--grid);
+    background: linear-gradient(to bottom, #0a0e27 0%, #151b3d 100%);
+    border-radius: 4px;
+    cursor: crosshair;
+  }
+  
+  /* Control panel */
+  .control-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .panel-section {
+    background: var(--surface);
+    border: 2px solid var(--grid);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+  
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent1);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .section-title::before {
+    content: '▸';
+    color: var(--accent2);
+  }
+  
+  /* Input area */
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .input-label {
+    font-size: 0.75rem;
+    color: var(--textDim);
+    letter-spacing: 0.05em;
+  }
+  
+  #equationInput {
+    width: 100%;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    background: #0a0e27;
+    border: 2px solid var(--grid);
+    border-radius: 4px;
+    color: var(--accent1);
+    transition: all 0.3s;
+  }
+  
+  #equationInput:focus {
+    outline: none;
+    border-color: var(--accent1);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  }
+  
+  .button-row {
+    display: flex;
+    gap: 8px;
+  }
+  
+  button {
+    flex: 1;
+    padding: 12px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 2px solid var(--grid);
+    background: linear-gradient(135deg, var(--surface), #1a1f4a);
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(0, 240, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+  }
+  
+  button:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+  
+  button:hover {
+    border-color: var(--accent1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 240, 255, 0.3);
+  }
+  
+  button:active {
+    transform: translateY(0);
+  }
+  
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  #runBtn {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(255, 0, 110, 0.2));
+    border-color: var(--accent1);
+    color: var(--accent1);
+  }
+  
+  #hintBtn {
+    background: linear-gradient(135deg, rgba(255, 214, 10, 0.2), rgba(255, 140, 0, 0.2));
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+  
+  #nextLevelBtn {
+    background: linear-gradient(135deg, rgba(57, 255, 20, 0.2), rgba(0, 200, 83, 0.2));
+    border-color: var(--success);
+    color: var(--success);
+  }
+  
+  /* Calculator */
+  .calculator {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  
+  .calc-btn {
+    padding: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    border: 1px solid var(--grid);
+    background: #0a0e27;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  
+  .calc-btn:hover {
+    background: var(--grid);
+    border-color: var(--accent1);
+    color: var(--accent1);
+  }
+  
+  .calc-btn.wide { grid-column: span 2; }
+  .calc-btn.operator { background: rgba(0, 240, 255, 0.1); color: var(--accent1); }
+  .calc-btn.function { background: rgba(255, 0, 110, 0.1); color: var(--accent2); font-size: 0.75rem; }
+  
+  /* Status messages */
+  .status-box {
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    text-align: center;
+    border: 2px solid;
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .status-error {
+    background: rgba(255, 0, 110, 0.1);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  
+  .status-success {
+    background: rgba(57, 255, 20, 0.1);
+    border-color: var(--success);
+    color: var(--success);
+  }
+  
+  .status-info {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--accent1);
+    color: var(--accent1);
+  }
+  
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.75rem;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .legend-color {
+    width: 24px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  @media (max-width: 1024px) {
+    .game-container {
+      grid-template-columns: 1fr;
+    }
+    
+    h1 { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EQUATION PATHFINDER</h1>
+  <div class="subtitle">Navigate with Mathematics</div>
+</header>
+
+<div class="difficulty-bar">
+  <button class="diff-btn active" data-difficulty="easy">Easy</button>
+  <button class="diff-btn" data-difficulty="medium">Medium</button>
+  <button class="diff-btn" data-difficulty="hard">Hard</button>
+</div>
+
+<div class="game-container">
+  <div class="canvas-area">
+    <div class="level-header">
+      <div class="level-info">Level <span id="levelNum">1</span></div>
+      <div class="stats">
+        <div class="stat-item">
+          <span>Attempts:</span>
+          <span id="attempts">0</span>
+        </div>
+        <div class="stat-item">
+          <span>Solved:</span>
+          <span id="solved">0</span>
+        </div>
+      </div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+  </div>
+  
+  <div class="control-panel">
+    <!-- Equation Input -->
+    <div class="panel-section">
+      <div class="section-title">Equation Input</div>
+      <div class="input-group">
+        <label class="input-label">Enter f(x):</label>
+        <input type="text" id="equationInput" placeholder="e.g., x^2, sin(x), 2*x + 1" autocomplete="off">
+        <div class="button-row">
+          <button id="runBtn">Run</button>
+          <button id="hintBtn">Show Solution</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Calculator -->
+    <div class="panel-section">
+      <div class="section-title">Calculator</div>
+      <div class="calculator">
+        <button class="calc-btn function" data-value="sin(">sin</button>
+        <button class="calc-btn function" data-value="cos(">cos</button>
+        <button class="calc-btn function" data-value="tan(">tan</button>
+        <button class="calc-btn function" data-value="sqrt(">√</button>
+        <button class="calc-btn function" data-value="abs(">|x|</button>
+        
+        <button class="calc-btn" data-value="7">7</button>
+        <button class="calc-btn" data-value="8">8</button>
+        <button class="calc-btn" data-value="9">9</button>
+        <button class="calc-btn operator" data-value="/">/</button>
+        <button class="calc-btn operator" data-value="^">^</button>
+        
+        <button class="calc-btn" data-value="4">4</button>
+        <button class="calc-btn" data-value="5">5</button>
+        <button class="calc-btn" data-value="6">6</button>
+        <button class="calc-btn operator" data-value="*">×</button>
+        <button class="calc-btn operator" data-value="(">(</button>
+        
+        <button class="calc-btn" data-value="1">1</button>
+        <button class="calc-btn" data-value="2">2</button>
+        <button class="calc-btn" data-value="3">3</button>
+        <button class="calc-btn operator" data-value="-">−</button>
+        <button class="calc-btn operator" data-value=")">)</button>
+        
+        <button class="calc-btn" data-value="0">0</button>
+        <button class="calc-btn" data-value=".">.</button>
+        <button class="calc-btn operator" data-value="x">x</button>
+        <button class="calc-btn operator" data-value="+">+</button>
+        <button class="calc-btn function" data-value="pi">π</button>
+        
+        <button class="calc-btn function wide" data-value="log(">log</button>
+        <button class="calc-btn function wide" data-value="ln(">ln</button>
+        <button class="calc-btn" onclick="clearCalc()">C</button>
+      </div>
+    </div>
+    
+    <!-- Status -->
+    <div class="panel-section">
+      <div class="section-title">Status</div>
+      <div id="statusBox"></div>
+      <button id="nextLevelBtn" style="display: none; margin-top: 12px;">Next Level</button>
+    </div>
+    
+    <!-- Legend -->
+    <div class="panel-section">
+      <div class="section-title">Legend</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #00f0ff;"></div>
+          <span>Your Character</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #39ff14;"></div>
+          <span>Goal</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ff006e;"></div>
+          <span>Obstacles</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: rgba(255, 214, 10, 0.3); border-style: dashed;"></div>
+          <span>Hint Path</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Game state
+const state = {
+  level: 1,
+  difficulty: 'easy',
+  attempts: 0,
+  solved: 0,
+  currentLevel: null,
+  isAnimating: false,
+  hintPath: null,
+  playerHistory: []
+};
+
+// Canvas setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Grid configuration
+const gridConfig = {
+  xMin: -2,
+  xMax: 10,
+  yMin: -2,
+  yMax: 20,
+  xScale: canvas.width / 12,
+  yScale: canvas.height / 22
+};
+
+// DOM elements
+const equationInput = document.getElementById('equationInput');
+const runBtn = document.getElementById('runBtn');
+const hintBtn = document.getElementById('hintBtn');
+const nextLevelBtn = document.getElementById('nextLevelBtn');
+const statusBox = document.getElementById('statusBox');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  generateLevel();
+  setupEventListeners();
+});
+
+function setupEventListeners() {
+  // Difficulty buttons
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.difficulty = btn.dataset.difficulty;
+      state.level = 1;
+      state.attempts = 0;
+      state.solved = 0;
+      updateStats();
+      generateLevel();
+    });
+  });
+  
+  // Calculator buttons
+  document.querySelectorAll('.calc-btn').forEach(btn => {
+    if (btn.dataset.value) {
+      btn.addEventListener('click', () => {
+        equationInput.value += btn.dataset.value;
+        equationInput.focus();
+      });
+    }
+  });
+  
+  // Run button
+  runBtn.addEventListener('click', runEquation);
+  equationInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') runEquation();
+  });
+  
+  // Hint button
+  hintBtn.addEventListener('click', getHint);
+  
+  // Next level button
+  nextLevelBtn.addEventListener('click', () => {
+    state.level++;
+    generateLevel();
+  });
+}
+
+function clearCalc() {
+  equationInput.value = '';
+  equationInput.focus();
+}
+
+// Coordinate transformation
+function toCanvasX(x) {
+  return (x - gridConfig.xMin) * gridConfig.xScale;
+}
+
+function toCanvasY(y) {
+  return canvas.height - (y - gridConfig.yMin) * gridConfig.yScale;
+}
+
+// Draw grid
+function drawGrid() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Grid lines
+  ctx.strokeStyle = 'rgba(30, 40, 82, 0.5)';
+  ctx.lineWidth = 1;
+  
+  for (let x = gridConfig.xMin; x <= gridConfig.xMax; x++) {
+    if (x === 0) continue;
+    const canvasX = toCanvasX(x);
+    ctx.beginPath();
+    ctx.moveTo(canvasX, 0);
+    ctx.lineTo(canvasX, canvas.height);
+    ctx.stroke();
+  }
+  
+  for (let y = gridConfig.yMin; y <= gridConfig.yMax; y++) {
+    if (y === 0) continue;
+    const canvasY = toCanvasY(y);
+    ctx.beginPath();
+    ctx.moveTo(0, canvasY);
+    ctx.lineTo(canvas.width, canvasY);
+    ctx.stroke();
+  }
+  
+  // Axes
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+  ctx.lineWidth = 2;
+  
+  // X-axis
+  const y0 = toCanvasY(0);
+  ctx.beginPath();
+  ctx.moveTo(0, y0);
+  ctx.lineTo(canvas.width, y0);
+  ctx.stroke();
+  
+  // Y-axis
+  const x0 = toCanvasX(0);
+  ctx.beginPath();
+  ctx.moveTo(x0, 0);
+  ctx.lineTo(x0, canvas.height);
+  ctx.stroke();
+  
+  // Axis labels
+  ctx.fillStyle = 'rgba(139, 146, 184, 0.6)';
+  ctx.font = '11px JetBrains Mono';
+  ctx.fillText('x', canvas.width - 15, y0 - 8);
+  ctx.fillText('y', x0 + 8, 15);
+}
+
+// Draw level elements
+function drawLevel() {
+  drawGrid();
+  
+  if (!state.currentLevel) return;
+  
+  // Draw obstacles
+  ctx.fillStyle = 'rgba(255, 0, 110, 0.3)';
+  ctx.strokeStyle = '#ff006e';
+  ctx.lineWidth = 2;
+  
+  state.currentLevel.obstacles.forEach(obs => {
+    const x1 = toCanvasX(obs.x1);
+    const y1 = toCanvasY(obs.y1);
+    const width = toCanvasX(obs.x2) - x1;
+    const height = toCanvasY(obs.y2) - y1;
+    
+    ctx.fillRect(x1, y1, width, height);
+    ctx.strokeRect(x1, y1, width, height);
+  });
+  
+  // Draw hint path if exists
+  if (state.hintPath) {
+    drawPath(state.hintPath, 'rgba(255, 214, 10, 0.4)', true);
+  }
+  
+  // Draw goal
+  const goalX = toCanvasX(state.currentLevel.goalX);
+  const goalY = toCanvasY(state.currentLevel.goalY);
+  
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = '#39ff14';
+  ctx.fillStyle = '#39ff14';
+  ctx.beginPath();
+  ctx.arc(goalX, goalY, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Goal label
+  ctx.fillStyle = '#39ff14';
+  ctx.font = 'bold 11px JetBrains Mono';
+  ctx.fillText(`(${state.currentLevel.goalX}, ${state.currentLevel.goalY})`, goalX + 12, goalY - 8);
+}
+
+// Draw a path
+function drawPath(equation, color, isDashed = false) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  
+  if (isDashed) {
+    ctx.setLineDash([8, 4]);
+  } else {
+    ctx.setLineDash([]);
+  }
+  
+  ctx.beginPath();
+  let started = false;
+  
+  for (let x = gridConfig.xMin; x <= gridConfig.xMax; x += 0.05) {
+    try {
+      const y = evaluateEquation(equation, x);
+      if (!isFinite(y)) continue;
+      
+      const canvasX = toCanvasX(x);
+      const canvasY = toCanvasY(y);
+      
+      if (!started) {
+        ctx.moveTo(canvasX, canvasY);
+        started = true;
+      } else {
+        ctx.lineTo(canvasX, canvasY);
+      }
+    } catch (e) {
+      // Skip invalid points
+    }
+  }
+  
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// Normalize equation
+function normalizeEquation(eq) {
+  let normalized = eq.trim();
+  
+  // Handle special characters first
+  normalized = normalized.replace(/×/g, '*');
+  normalized = normalized.replace(/÷/g, '/');
+  normalized = normalized.replace(/²/g, '^2');
+  normalized = normalized.replace(/³/g, '^3');
+  normalized = normalized.replace(/√/g, 'sqrt');
+  normalized = normalized.replace(/π/g, 'pi');
+  
+  // Handle implicit multiplication
+  // Numbers followed by variables: 2x -> 2*x (but not 2sin, that's handled below)
+  normalized = normalized.replace(/(\d)([a-z])/gi, (match, num, letter) => {
+    // Check if this is the start of a function name by looking ahead
+    const restOfString = normalized.substring(normalized.indexOf(match) + match.length);
+    const isFunction = /^[a-z]*\(/i.test(letter + restOfString);
+    return isFunction ? match : num + '*' + letter;
+  });
+  
+  // Closing parenthesis followed by anything: )x -> )*x, )2 -> )*2, )( -> )*(
+  normalized = normalized.replace(/(\))([a-z\d\(])/gi, '$1*$2');
+  
+  // Number/variable followed by opening parenthesis: x( -> x*(, 2( -> 2*(
+  // But NOT function( where function is sin, cos, sqrt, etc.
+  normalized = normalized.replace(/(\d)(\()/g, '$1*$2'); // number before paren: 2( -> 2*(
+  
+  // For letters before parentheses, we need to check it's not a function
+  // This regex uses negative lookbehind to exclude function names
+  const funcPattern = /\b(sin|cos|tan|asin|acos|atan|sinh|cosh|tanh|sqrt|abs|log|ln|exp|ceil|floor|round|nthRoot)\(/gi;
+  const functions = [];
+  let tempNormalized = normalized;
+  
+  // Extract and protect function calls
+  tempNormalized = tempNormalized.replace(funcPattern, (match) => {
+    functions.push(match);
+    return `__FUNC${functions.length - 1}__`;
+  });
+  
+  // Now add implicit multiplication for remaining cases: x( -> x*(
+  tempNormalized = tempNormalized.replace(/([a-z])(\()/gi, '$1*$2');
+  
+  // Restore function calls
+  functions.forEach((func, i) => {
+    tempNormalized = tempNormalized.replace(`__FUNC${i}__`, func);
+  });
+  
+  return tempNormalized;
+}
+
+// Evaluate equation
+function evaluateEquation(eq, xValue) {
+  const normalized = normalizeEquation(eq);
+  const scope = { x: xValue };
+  return math.evaluate(normalized, scope);
+}
+
+// Check collision with obstacles
+function checkCollision(equation) {
+  for (let x = gridConfig.xMin; x <= gridConfig.xMax; x += 0.05) {
+    try {
+      const y = evaluateEquation(equation, x);
+      if (!isFinite(y)) continue;
+      
+      for (const obs of state.currentLevel.obstacles) {
+        if (x >= obs.x1 && x <= obs.x2 && y >= obs.y2 && y <= obs.y1) {
+          return true;
+        }
+      }
+    } catch (e) {
+      // Continue
+    }
+  }
+  return false;
+}
+
+// Check if path reaches goal
+function checkGoalReached(equation) {
+  const tolerance = 0.25;
+  
+  for (let x = gridConfig.xMin; x <= gridConfig.xMax; x += 0.02) {
+    try {
+      const y = evaluateEquation(equation, x);
+      if (!isFinite(y)) continue;
+      
+      const dx = Math.abs(x - state.currentLevel.goalX);
+      const dy = Math.abs(y - state.currentLevel.goalY);
+      
+      if (dx < tolerance && dy < tolerance) {
+        return true;
+      }
+    } catch (e) {
+      // Continue
+    }
+  }
+  return false;
+}
+
+// Check if a single point collides with obstacles
+function pointCollidesWithObstacle(x, y) {
+  for (const obs of state.currentLevel.obstacles) {
+    if (x >= obs.x1 && x <= obs.x2 && y >= obs.y2 && y <= obs.y1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Animate character along path
+async function animateCharacter(equation) {
+  return new Promise((resolve) => {
+    const points = [];
+    
+    for (let x = gridConfig.xMin; x <= gridConfig.xMax; x += 0.1) {
+      try {
+        const y = evaluateEquation(equation, x);
+        if (isFinite(y)) {
+          points.push({ x, y });
+        }
+      } catch (e) {
+        // Skip
+      }
+    }
+    
+    let index = 0;
+    let hitObstacle = false;
+    
+    const interval = setInterval(() => {
+      if (index >= points.length || hitObstacle) {
+        clearInterval(interval);
+        resolve({ hitObstacle, stoppedAt: hitObstacle ? points[index - 1] : null });
+        return;
+      }
+      
+      // Check if current point hits an obstacle
+      const currentPoint = points[index];
+      if (pointCollidesWithObstacle(currentPoint.x, currentPoint.y)) {
+        hitObstacle = true;
+        // Draw one more time to show the collision point
+        drawLevel();
+        
+        // Draw path up to collision point
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        
+        for (let i = 0; i < index; i++) {
+          const canvasX = toCanvasX(points[i].x);
+          const canvasY = toCanvasY(points[i].y);
+          
+          if (i === 0) {
+            ctx.moveTo(canvasX, canvasY);
+          } else {
+            ctx.lineTo(canvasX, canvasY);
+          }
+        }
+        ctx.stroke();
+        
+        // Draw character at collision point in red with explosion effect
+        const currentX = toCanvasX(currentPoint.x);
+        const currentY = toCanvasY(currentPoint.y);
+        
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff006e';
+        ctx.fillStyle = '#ff006e';
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Draw X mark
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(currentX - 4, currentY - 4);
+        ctx.lineTo(currentX + 4, currentY + 4);
+        ctx.moveTo(currentX + 4, currentY - 4);
+        ctx.lineTo(currentX - 4, currentY + 4);
+        ctx.stroke();
+        
+        return;
+      }
+      
+      drawLevel();
+      
+      // Draw path up to current point
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      
+      for (let i = 0; i <= index; i++) {
+        const canvasX = toCanvasX(points[i].x);
+        const canvasY = toCanvasY(points[i].y);
+        
+        if (i === 0) {
+          ctx.moveTo(canvasX, canvasY);
+        } else {
+          ctx.lineTo(canvasX, canvasY);
+        }
+      }
+      ctx.stroke();
+      
+      // Draw character
+      const currentX = toCanvasX(currentPoint.x);
+      const currentY = toCanvasY(currentPoint.y);
+      
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#00f0ff';
+      ctx.fillStyle = '#00f0ff';
+      ctx.beginPath();
+      ctx.arc(currentX, currentY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      
+      index++;
+    }, 20);
+  });
+}
+
+// Run equation
+async function runEquation() {
+  if (state.isAnimating) return;
+  
+  const equation = equationInput.value.trim();
+  if (!equation) {
+    showStatus('Please enter an equation', 'error');
+    return;
+  }
+  
+  // Clear hint
+  state.hintPath = null;
+  
+  // Validate equation
+  try {
+    evaluateEquation(equation, 0);
+  } catch (e) {
+    showStatus('Invalid equation. Try something like: x^2, sin(x), or 2*x + 1', 'error');
+    return;
+  }
+  
+  state.attempts++;
+  updateStats();
+  
+  // Animate
+  state.isAnimating = true;
+  runBtn.disabled = true;
+  hintBtn.disabled = true;
+  
+  const result = await animateCharacter(equation);
+  
+  // Check if we hit an obstacle
+  if (result.hitObstacle) {
+    state.playerHistory.push({
+      level: state.level,
+      equation: equation,
+      attempts: state.attempts,
+      success: false
+    });
+    showStatus('💥 Collision! Your path hit an obstacle. Try a different curve.', 'error');
+    state.isAnimating = false;
+    runBtn.disabled = false;
+    hintBtn.disabled = false;
+    return;
+  }
+  
+  // Check if goal reached
+  if (checkGoalReached(equation)) {
+    state.solved++;
+    state.playerHistory.push({
+      level: state.level,
+      equation: equation,
+      attempts: state.attempts,
+      success: true
+    });
+    updateStats();
+    showStatus('🎯 Goal reached! Excellent work!', 'success');
+    nextLevelBtn.style.display = 'block';
+    runBtn.disabled = true;
+    hintBtn.disabled = true;
+  } else {
+    state.playerHistory.push({
+      level: state.level,
+      equation: equation,
+      attempts: state.attempts,
+      success: false
+    });
+    showStatus('Not quite there. The goal is out of reach with this equation.', 'error');
+    state.isAnimating = false;
+    runBtn.disabled = false;
+    hintBtn.disabled = false;
+  }
+}
+
+// Check if entire path collides with obstacles
+function pathCollidesWithObstacle(equation) {
+  for (let x = gridConfig.xMin; x <= gridConfig.xMax; x += 0.05) {
+    try {
+      const y = evaluateEquation(equation, x);
+      if (!isFinite(y)) continue;
+      
+      if (pointCollidesWithObstacle(x, y)) {
+        return true;
+      }
+    } catch (e) {
+      // Continue
+    }
+  }
+  return false;
+}
+
+// Calculate hint solution
+function getHint() {
+  if (!state.currentLevel) return;
+  
+  const goal = state.currentLevel;
+  const obstacles = goal.obstacles;
+  
+  // Try to find a simple solution
+  let hintEquation = null;
+  
+  // Strategy 1: Try a parabola shifted to pass through the goal
+  const a = goal.goalY / (goal.goalX * goal.goalX);
+  hintEquation = `${a.toFixed(3)}*x^2`;
+  
+  if (!pathCollidesWithObstacle(hintEquation) && checkGoalReached(hintEquation)) {
+    state.hintPath = hintEquation;
+    drawLevel();
+    showStatus('Hint shown as dotted line. Try to find your own path!', 'info');
+    return;
+  }
+  
+  // Strategy 2: Try linear
+  const m = goal.goalY / goal.goalX;
+  hintEquation = `${m.toFixed(3)}*x`;
+  
+  if (!pathCollidesWithObstacle(hintEquation) && checkGoalReached(hintEquation)) {
+    state.hintPath = hintEquation;
+    drawLevel();
+    showStatus('Hint shown as dotted line. Try to find your own path!', 'info');
+    return;
+  }
+  
+  // Strategy 3: Try cubic
+  const b = goal.goalY / (goal.goalX * goal.goalX * goal.goalX);
+  hintEquation = `${b.toFixed(3)}*x^3`;
+  
+  if (!pathCollidesWithObstacle(hintEquation) && checkGoalReached(hintEquation)) {
+    state.hintPath = hintEquation;
+    drawLevel();
+    showStatus('Hint shown as dotted line. Try to find your own path!', 'info');
+    return;
+  }
+  
+  // Strategy 4: Try sine wave
+  const amplitude = goal.goalY;
+  const frequency = Math.PI / goal.goalX;
+  hintEquation = `${amplitude.toFixed(3)}*sin(${frequency.toFixed(3)}*x)`;
+  
+  if (!pathCollidesWithObstacle(hintEquation) && checkGoalReached(hintEquation)) {
+    state.hintPath = hintEquation;
+    drawLevel();
+    showStatus('Hint shown as dotted line. Try to find your own path!', 'info');
+    return;
+  }
+  
+  // Strategy 5: Try exponential approach
+  hintEquation = `${(goal.goalY / Math.exp(goal.goalX)).toFixed(3)}*e^x`;
+  
+  if (!pathCollidesWithObstacle(hintEquation) && checkGoalReached(hintEquation)) {
+    state.hintPath = hintEquation;
+    drawLevel();
+    showStatus('Hint shown as dotted line. Try to find your own path!', 'info');
+    return;
+  }
+  
+  // If nothing works, just show the parabola anyway as a hint
+  state.hintPath = `${a.toFixed(3)}*x^2`;
+  drawLevel();
+  showStatus('Hint path shown (may not avoid all obstacles). Use as inspiration!', 'info');
+}
+
+// Procedural level generator
+function generateLevel() {
+  state.attempts = 0;
+  state.hintPath = null;
+  state.isAnimating = false;
+  nextLevelBtn.style.display = 'none';
+  runBtn.disabled = false;
+  hintBtn.disabled = false;
+  equationInput.value = '';
+  statusBox.innerHTML = '';
+  
+  // Seed for deterministic random
+  const seed = state.level * 7919 + (state.difficulty === 'easy' ? 0 : state.difficulty === 'medium' ? 1000 : 2000);
+  
+  function seededRandom() {
+    const x = Math.sin(seed + Math.random() * 10000) * 10000;
+    return x - Math.floor(x);
+  }
+  
+  let goalX, goalY, obstacles;
+  
+  if (state.difficulty === 'easy') {
+    // Easy: simple goals, few obstacles
+    goalX = 3 + Math.floor(seededRandom() * 4); // 3-6
+    goalY = 6 + Math.floor(seededRandom() * 8); // 6-13
+    
+    const numObstacles = state.level <= 2 ? 0 : Math.min(2, Math.floor(state.level / 3));
+    obstacles = [];
+    
+    for (let i = 0; i < numObstacles; i++) {
+      obstacles.push({
+        x1: 1 + seededRandom() * 2,
+        x2: 2 + seededRandom() * 2,
+        y1: 4 + seededRandom() * 4,
+        y2: 2 + seededRandom() * 3
+      });
+    }
+    
+  } else if (state.difficulty === 'medium') {
+    // Medium: moderate goals, more obstacles
+    goalX = 4 + Math.floor(seededRandom() * 4); // 4-7
+    goalY = 8 + Math.floor(seededRandom() * 9); // 8-16
+    
+    const numObstacles = 2 + Math.min(2, Math.floor(state.level / 2));
+    obstacles = [];
+    
+    for (let i = 0; i < numObstacles; i++) {
+      obstacles.push({
+        x1: 1 + seededRandom() * 4,
+        x2: 2 + seededRandom() * 4,
+        y1: 3 + seededRandom() * 12,
+        y2: 1 + seededRandom() * 8
+      });
+    }
+    
+  } else {
+    // Hard: complex goals, many obstacles
+    goalX = 5 + Math.floor(seededRandom() * 4); // 5-8
+    goalY = 10 + Math.floor(seededRandom() * 9); // 10-18
+    
+    const numObstacles = 3 + Math.min(3, Math.floor(state.level / 2));
+    obstacles = [];
+    
+    // Add strategic obstacles
+    // Block horizontal line at goal Y
+    obstacles.push({
+      x1: 2,
+      x2: goalX - 0.5,
+      y1: goalY + 0.5,
+      y2: goalY - 0.5
+    });
+    
+    for (let i = 1; i < numObstacles; i++) {
+      obstacles.push({
+        x1: 1 + seededRandom() * 5,
+        x2: 2 + seededRandom() * 5,
+        y1: 2 + seededRandom() * 15,
+        y2: 1 + seededRandom() * 10
+      });
+    }
+  }
+  
+  // Ensure obstacles are valid (x1 < x2, y2 < y1)
+  obstacles = obstacles.map(obs => ({
+    x1: Math.min(obs.x1, obs.x2),
+    x2: Math.max(obs.x1, obs.x2),
+    y1: Math.max(obs.y1, obs.y2),
+    y2: Math.min(obs.y1, obs.y2)
+  }));
+  
+  state.currentLevel = {
+    goalX: Math.round(goalX * 10) / 10,
+    goalY: Math.round(goalY * 10) / 10,
+    obstacles: obstacles
+  };
+  
+  drawLevel();
+  updateStats();
+  showStatus(`Level ${state.level} - Reach (${state.currentLevel.goalX}, ${state.currentLevel.goalY})`, 'info');
+}
+
+// Show status message
+function showStatus(message, type) {
+  statusBox.innerHTML = `<div class="status-box status-${type}">${message}</div>`;
+}
+
+// Update stats display
+function updateStats() {
+  document.getElementById('levelNum').textContent = state.level;
+  document.getElementById('attempts').textContent = state.attempts;
+  document.getElementById('solved').textContent = state.solved;
+}
+</script>
+
+</body>
+</html>
